@@ -59,8 +59,8 @@ static PyObject *method_new_generator(PyObject *self, PyObject *args)
         return NULL;
     }
 
+    Py_INCREF(f);
     PyObject *g = PyGen_New(f);
-    Py_INCREF(g);
 
     return g;
 }
@@ -102,39 +102,6 @@ static PyObject *method_overwrite_bytes(PyObject *self, PyObject *args)
     return Py_True;
 }
 
-static PyObject *method_magic(PyObject *self, PyObject *args)
-{
-    PyBytesObject *new_co_code;
-    struct _frame *fr;
-    if (!PyArg_ParseTuple(args, "OO", &fr, &new_co_code))
-    {
-        return NULL;
-    }
-
-    PyCodeObject *f_code = fr->f_code;
-    PyBytesObject *old_co_code = (PyBytesObject *)f_code->co_code;
-
-    char *old_code_ptr = (char *)PyBytes_AS_STRING(old_co_code);
-    int old_code_len = PyBytes_GET_SIZE(old_co_code);
-    char *new_code_ptr = (char *)PyBytes_AS_STRING(new_co_code);
-    int new_code_len = PyBytes_GET_SIZE(new_co_code);
-
-    printf("old co_code ptr: %p - len: %d\n", old_code_ptr, old_code_len);
-    printf("new co_code ptr: %p - len: %d\n", new_code_ptr, new_code_len);
-
-    memcpy(old_code_ptr, new_code_ptr, old_code_len);
-
-    f_code->co_code = new_co_code;
-    Py_INCREF(new_co_code);
-
-    // PyObject **specials = hihi->f_valuestack - FRAME_SPECIALS_SIZE;
-    // PyCodeObject *my_co = (PyCodeObject *)specials[FRAME_SPECIALS_CODE_OFFSET];
-    // printf("%lx - %p\n", my_co, hihi->f_code);
-    // hihi->f_code->co_code = co_code;
-
-    return Py_None;
-}
-
 static PyMethodDef Methods[] = {
     {"count_sync_funcs", method_count_sync_funcs, METH_VARARGS, ""},
     {"is_injected", method_is_injected, METH_VARARGS, ""},
@@ -142,7 +109,6 @@ static PyMethodDef Methods[] = {
     {"new_generator", method_new_generator, METH_VARARGS, ""},
     {"replace_co_code", method_replace_co_code, METH_VARARGS, ""},
     {"overwrite_bytes", method_overwrite_bytes, METH_VARARGS, ""},
-    {"magic", method_magic, METH_VARARGS, "Python interface for fputs C library function"},
     {NULL, NULL, 0, NULL}};
 
 static struct PyModuleDef module = {
