@@ -4,8 +4,6 @@
 
 // TODO: fix ref count
 
-#define CO_INJECTED 0x80000000
-
 // count upward for sync funcs called
 static PyObject *method_count_sync_funcs(PyObject *self, PyObject *args)
 {
@@ -28,26 +26,36 @@ static PyObject *method_count_sync_funcs(PyObject *self, PyObject *args)
 static PyObject *method_is_injected(PyObject *self, PyObject *args)
 {
     PyCodeObject *co;
-    if (!PyArg_ParseTuple(args, "O", &co))
+    PyBytesObject *i_sync, *i_async;
+    int i_idx;
+    if (!PyArg_ParseTuple(args, "OiOO", &co, &i_idx, &i_sync, &i_async))
     {
         return NULL;
     }
 
-    return PyBool_FromLong(co->co_flags & CO_INJECTED);
-}
+    char *co_code_ptr = PyBytes_AS_STRING(co->co_code);
+    char *i_ptr = NULL;
+    int i_len = 0;
 
-// mark injected
-static PyObject *method_mark_injected(PyObject *self, PyObject *args)
-{
-    PyCodeObject *co;
-    if (!PyArg_ParseTuple(args, "O", &co))
+    if (co->co_flags & CO_COROUTINE)
     {
-        return NULL;
+        i_ptr = PyBytes_AsString(i_async);
+        i_len = PyBytes_GET_SIZE(i_async);
+    }
+    else
+    {
+        i_ptr = PyBytes_AS_STRING(i_sync);
+        i_len = PyBytes_GET_SIZE(i_sync);
     }
 
-    co->co_flags |= CO_INJECTED;
-
-    return Py_True;
+    if (memcmp(co_code_ptr + i_idx, i_ptr, i_len))
+    {
+        return Py_False;
+    }
+    else
+    {
+        return Py_True;
+    }
 }
 
 // create generator object from frame
@@ -111,7 +119,6 @@ static PyObject *method_overwrite_bytes(PyObject *self, PyObject *args)
 static PyMethodDef Methods[] = {
     {"count_sync_funcs", method_count_sync_funcs, METH_VARARGS, ""},
     {"is_injected", method_is_injected, METH_VARARGS, ""},
-    {"mark_injected", method_mark_injected, METH_VARARGS, ""},
     {"new_generator", method_new_generator, METH_VARARGS, ""},
     {"replace_co_code", method_replace_co_code, METH_VARARGS, ""},
     {"overwrite_bytes", method_overwrite_bytes, METH_VARARGS, ""},

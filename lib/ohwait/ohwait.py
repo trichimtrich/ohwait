@@ -16,7 +16,7 @@ I_ASYNC += asm("UNPACK_SEQUENCE", 2)  # unpack =>  gen2, (__await__, gen1)
 I_ASYNC += asm("YIELD_FROM")  # send tuple, gen2 == receiver
 
 
-def ohwait(coro):
+def ohwait(coro, g_debug={}):
     assert inspect.iscoroutine(coro), "must be a coroutine"
     no_sync = ohno.count_sync_funcs()
 
@@ -30,11 +30,12 @@ def ohwait(coro):
         if i > 0:
             gen = ohno.new_generator(f)
             ret = (ret, gen)
+
         f = f.f_back
+        i_idx = f.f_lasti + 2
         f_code = f.f_code
 
-        # TODO: fix pls, this only allows 1 ohwait in sync func
-        if ohno.is_injected(f_code):
+        if ohno.is_injected(f_code, i_idx, I_SYNC, I_ASYNC):
             continue
 
         if i < no_sync:
@@ -51,14 +52,16 @@ def ohwait(coro):
             i_code = I_ASYNC
             o_len = 4
 
-        i_idx = f.f_lasti + 2
         co_code = f_code.co_code
         new_co_code = do_inject(co_code, i_idx, i_code)
         ohno.overwrite_bytes(co_code, i_idx, i_code[:o_len])
         ohno.replace_co_code(f_code, new_co_code, f_code.co_stacksize + 1)
 
-        # TODO: this coordinates with `is_injected`, find a better way
-        ohno.mark_injected(f_code)
+    if g_debug:
+        from dis import dis
+        import code
+
+        code.interact(local={**globals(), **locals(), **g_debug})
 
     # return ((__await__, gen1), gen2)
     return ret
