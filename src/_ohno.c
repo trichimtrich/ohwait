@@ -68,15 +68,21 @@ static PyObject *method_new_generator(PyObject *self, PyObject *args)
 // replace co_code bytes of code object
 static PyObject *method_replace_co_code(PyObject *self, PyObject *args)
 {
-    PyBytesObject *co_code;
     PyCodeObject *co;
-    if (!PyArg_ParseTuple(args, "OO", &co, &co_code))
+    PyBytesObject *co_code;
+    int co_stacksize;
+    if (!PyArg_ParseTuple(args, "OOi", &co, &co_code, &co_stacksize))
     {
         return NULL;
     }
 
-    co->co_code = co_code;
     Py_INCREF(co_code);
+    co->co_code = co_code;
+
+    if (co_stacksize)
+    {
+        co->co_stacksize = co_stacksize;
+    }
 
     return Py_True;
 }

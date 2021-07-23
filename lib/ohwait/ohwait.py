@@ -4,8 +4,6 @@ from ._asm import do_inject, asm
 import ohwait._ohno as ohno
 import ohwait._asynclib as lib
 
-# TODO: expand stack size
-
 # modify sync funcs
 I_SYNC = b""  # ((__await__, gen1), gen2)
 I_SYNC += asm("YIELD_VALUE")  # send tuple, recv (__await__, gen1)
@@ -57,7 +55,7 @@ def ohwait(coro):
         co_code = f_code.co_code
         new_co_code = do_inject(co_code, i_idx, i_code)
         ohno.overwrite_bytes(co_code, i_idx, i_code[:o_len])
-        ohno.replace_co_code(f_code, new_co_code)
+        ohno.replace_co_code(f_code, new_co_code, f_code.co_stacksize + 1)
 
         # TODO: this coordinates with `is_injected`, find a better way
         ohno.mark_injected(f_code)
