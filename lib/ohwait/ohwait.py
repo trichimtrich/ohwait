@@ -7,7 +7,7 @@ import ohwait._asynclib as lib
 # TODO: expand stack size
 
 
-def ohwait2(coro):
+def ohwait(coro):
     no_sync = ohno.count_sync_funcs()
 
     f = inspect.currentframe()
@@ -57,8 +57,11 @@ def ohwait2(coro):
         # TODO: this coordinates with `is_injected`, find a better way
         ohno.mark_injected(f_code)
 
+    # return ((__await__, gen1), gen2)
+    return ret
 
-def ohwait(coro):
+
+def ohwait2(coro):
     assert inspect.iscoroutine(coro), "must be a coroutine"
     no_sync = ohno.count_sync_funcs()
 
