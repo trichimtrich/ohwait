@@ -107,7 +107,7 @@ This experiment is trying to archive that in the high level approach (python mod
 
 - There is no problem with the original Python spec. Also the API designing (for `async` or `non-async`) is follow developers decision with his/her principles, there no best practice or language specs to answer this.
 
-- This code is NOT production ready, and only work for some use-case. Use as your own risk and don't blame me �.
+- This code is NOT production ready, and only work for some use-case. Use as your own risk and don't blame me 😶.
 
 # Instruction
 
