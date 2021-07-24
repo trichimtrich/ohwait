@@ -4,12 +4,11 @@ from . import _ohno as ohno
 from ._asm import do_inject, asm
 from . import _asynclib as lib
 
-i_magic = b""  # (data, gen)
-i_magic += asm("UNPACK_SEQUENCE", 2)  # gen -> data
-i_magic += asm("DUP_TOP")  # gen -> data -> data
-i_magic += asm("POP_JUMP_IF_FALSE", 8)  # check data == None , jump
-i_magic += asm("YIELD_VALUE")  # yield data back => recv data
-i_magic += asm("YIELD_FROM")  # send data, yield from
+I_MAGIC = b""  # (data, data, gen)
+I_MAGIC += asm("UNPACK_SEQUENCE", 3)  # gen -> data -> data
+I_MAGIC += asm("POP_JUMP_IF_FALSE", 6)  # check data == None , jump -> yield from
+I_MAGIC += asm("YIELD_VALUE")  # yield data back => recv data
+I_MAGIC += asm("YIELD_FROM")  # send data, yield from
 
 
 def ohwait(coro, g_debug={}):
@@ -30,15 +29,16 @@ def ohwait(coro, g_debug={}):
         f = f.f_back
         i_idx = f.f_lasti + 2
         f_code = f.f_code
+        co_code = f_code.co_code
 
         # TODO: some bytes are changed
-        if ohno.is_injected(f_code, i_idx, i_magic):
+        if ohno.is_injected(f_code, i_idx, I_MAGIC):
             continue
 
         co_code = f_code.co_code
 
         # TODO: upper part of injected code might grow...
-        new_co_code = do_inject(co_code, i_idx, i_magic)
+        new_co_code = do_inject(co_code, i_idx, I_MAGIC)
         ohno.overwrite_bytes(
             co_code, i_idx, new_co_code[i_idx : len(co_code)]
         )  # NOTE: xxx
@@ -46,7 +46,7 @@ def ohwait(coro, g_debug={}):
 
     ret = None
     for gen in rets[::-1]:
-        ret = (ret, gen)
+        ret = (ret, ret, gen)
 
     if g_debug:
         from dis import dis
