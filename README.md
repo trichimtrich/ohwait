@@ -41,7 +41,7 @@ asyncio.run(async_api_xyz())
 
 ### Integration
 
-Since from the begining Python wasn't designed for this concurrency concept (inconstrast with Golang), and it's kinda not good at threading (Check out another [David Beazley talk - Understanding the Pythong GIL](https://www.youtube.com/watch?v=Obt-vMVdM8s)). So after 15++ years, the new specification makes a large number of IO-bound libraries (which designed without the awareness about this concept) hard to intergrate to new `async` code.
+Since from the begining Python wasn't designed for this concurrency concept (inconstrast with Golang), and it's kinda not good at threading (Check out another [David Beazley talk - Understanding the Python GIL](https://www.youtube.com/watch?v=Obt-vMVdM8s)). So after 15++ years, the new specification makes a large number of IO-bound libraries (which designed without the awareness about this concept) hard to intergrate to new `async` code.
 
 Find out more about the [discussion here](https://bugs.python.org/issue22239) when someone trying to run nested asyncio loop for the problem when `sync` couldn't do `await`.
 
@@ -165,3 +165,19 @@ It works as expected, but the injection strategy is not perfect. Some of my note
 - Currently `co_code` in code object is changed permanently. So when doing injection, bytecodes need satisfy the revisiting of the routines (How about redo the injection with the new code object for each frame).
 - Generator wrapper for each subroutine also needs to be collected by GC.
 - Heap overflow can happen if your function doesn't have enough room (after `CALL_FUNCTION` bytecode) for replacing bytecode to unpack and yield data. (eg: function with only this line of code `return ohwait(coro)` )
+
+# References/Materials
+
+> How generator, async await works, yield from
+- https://stackoverflow.com/questions/49005651/how-does-asyncio-actually-work
+- https://towardsdatascience.com/cpython-internals-how-do-generators-work-ba1c4405b4bc
+- https://stackoverflow.com/questions/9708902/in-practice-what-are-the-main-uses-for-the-new-yield-from-syntax-in-python-3
+
+> PEP
+- Generator: https://www.python.org/dev/peps/pep-0255/
+- Coroutines: https://www.python.org/dev/peps/pep-0342/
+- Async/Await: https://www.python.org/dev/peps/pep-0492/#abstract
+- Async generator: https://www.python.org/dev/peps/pep-0525/
+
+> Greenlet
+- https://greenlet.readthedocs.io/en/latest/
