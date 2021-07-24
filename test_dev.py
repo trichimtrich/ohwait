@@ -9,7 +9,7 @@ async def coro(a):
 
 def sync_func():
     print("sync_func enter")
-    result = ohwait(coro(1), globals())
+    result = ohwait(coro(1))
     # result = ohwait(coro(2), globals())
     print("sync_func exit")
     return result

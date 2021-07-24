@@ -5,15 +5,15 @@ import ohwait._ohno as ohno
 import ohwait._asynclib as lib
 
 # modify sync funcs
-I_SYNC = b""  # ((__await__, gen1), gen2)
-I_SYNC += asm("YIELD_VALUE")  # send tuple, recv (__await__, gen1)
-I_SYNC += asm("UNPACK_SEQUENCE", 2)  # unpack => gen1, __await__
-I_SYNC += asm("YIELD_FROM")  # send __await__, gen1 == receiver
+I_SYNC = b""  # ((None, __await__), gen1)
+I_SYNC += asm("YIELD_VALUE")  # send tuple, recv (None, __await__)
+I_SYNC += asm("UNPACK_SEQUENCE", 2)  # unpack => __await__, None
+I_SYNC += asm("YIELD_FROM")  # send None, _await_ == receiver
 
 # modify async func
-I_ASYNC = b""  # recv => ((__await__, gen1), gen2)
-I_ASYNC += asm("UNPACK_SEQUENCE", 2)  # unpack =>  gen2, (__await__, gen1)
-I_ASYNC += asm("YIELD_FROM")  # send tuple, gen2 == receiver
+I_ASYNC = b""  # recv => ((None, __await__), gen1)
+I_ASYNC += asm("UNPACK_SEQUENCE", 2)  # unpack =>  gen1, (None, __await__)
+I_ASYNC += asm("YIELD_FROM")  # send tuple, gen1 == receiver
 
 
 def ohwait(coro, g_debug={}):
@@ -63,5 +63,5 @@ def ohwait(coro, g_debug={}):
 
         code.interact(local={**globals(), **locals(), **g_debug})
 
-    # return ((__await__, gen1), gen2)
+    # return ((None, __await__), gen1)
     return ret
