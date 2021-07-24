@@ -18,9 +18,13 @@ def sync_func():
 async def async_func():
     print("async_func enter")
     # await coro()
-    # print(ohwait(coro()))
+    # ohwait(coro(1), globals())
+    # print(ohwait(coro(1), globals()))
     print(sync_func())
+    result = ohwait(coro(4))
+    print(result)
     print("async_func exit")
+    return result
 
 
 import asyncio

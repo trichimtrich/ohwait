@@ -49,6 +49,7 @@ def code_to_insts(co_code):
             arg = inst.arg if inst.arg else 0
             offset = off_ext if off_ext else inst.offset
             rec = {
+                "opname": inst.opname,
                 "opcode": inst.opcode,
                 "offset": offset,
                 "arg": arg,

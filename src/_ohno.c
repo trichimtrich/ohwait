@@ -4,13 +4,15 @@
 
 // TODO: fix ref count
 
+#define CO_INJECTED 0x80000000
+
 // count upward for sync funcs called
 static PyObject *method_count_sync_funcs(PyObject *self, PyObject *args)
 {
     struct _frame *f = PyEval_GetFrame();
     int c = 0;
     // ignore current frame
-    for (f = f->f_back; f && !(f->f_code->co_flags & CO_COROUTINE); f = f->f_back, c++)
+    for (f = f->f_back; f && !(f->f_code->co_flags & (CO_INJECTED | CO_COROUTINE)); f = f->f_back, c++)
     {
     }
 
@@ -26,27 +28,16 @@ static PyObject *method_count_sync_funcs(PyObject *self, PyObject *args)
 static PyObject *method_is_injected(PyObject *self, PyObject *args)
 {
     PyCodeObject *co;
-    PyBytesObject *i_sync, *i_async;
+    PyBytesObject *i_code;
     int i_idx;
-    if (!PyArg_ParseTuple(args, "OiOO", &co, &i_idx, &i_sync, &i_async))
+    if (!PyArg_ParseTuple(args, "OiO", &co, &i_idx, &i_code))
     {
         return NULL;
     }
 
     char *co_code_ptr = PyBytes_AS_STRING(co->co_code);
-    char *i_ptr = NULL;
-    int i_len = 0;
-
-    if (co->co_flags & CO_COROUTINE)
-    {
-        i_ptr = PyBytes_AsString(i_async);
-        i_len = PyBytes_GET_SIZE(i_async);
-    }
-    else
-    {
-        i_ptr = PyBytes_AS_STRING(i_sync);
-        i_len = PyBytes_GET_SIZE(i_sync);
-    }
+    char *i_ptr = PyBytes_AS_STRING(i_code);
+    int i_len = PyBytes_GET_SIZE(i_code);
 
     if (memcmp(co_code_ptr + i_idx, i_ptr, i_len))
     {
@@ -91,6 +82,8 @@ static PyObject *method_replace_co_code(PyObject *self, PyObject *args)
     {
         co->co_stacksize = co_stacksize;
     }
+
+    co->co_flags |= CO_INJECTED;
 
     return Py_True;
 }

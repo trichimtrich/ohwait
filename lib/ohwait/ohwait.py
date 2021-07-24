@@ -1,19 +1,15 @@
 import inspect
 
+from . import _ohno as ohno
 from ._asm import do_inject, asm
-import ohwait._ohno as ohno
-import ohwait._asynclib as lib
+from . import _asynclib as lib
 
-# modify sync funcs
-I_SYNC = b""  # ((None, __await__), gen1)
-I_SYNC += asm("YIELD_VALUE")  # send tuple, recv (None, __await__)
-I_SYNC += asm("UNPACK_SEQUENCE", 2)  # unpack => __await__, None
-I_SYNC += asm("YIELD_FROM")  # send None, _await_ == receiver
-
-# modify async func
-I_ASYNC = b""  # recv => ((None, __await__), gen1)
-I_ASYNC += asm("UNPACK_SEQUENCE", 2)  # unpack =>  gen1, (None, __await__)
-I_ASYNC += asm("YIELD_FROM")  # send tuple, gen1 == receiver
+i_magic = b""  # (data, gen)
+i_magic += asm("UNPACK_SEQUENCE", 2)  # gen -> data
+i_magic += asm("DUP_TOP")  # gen -> data -> data
+i_magic += asm("POP_JUMP_IF_FALSE", 8)  # check data == None , jump
+i_magic += asm("YIELD_VALUE")  # yield data back => recv data
+i_magic += asm("YIELD_FROM")  # send data, yield from
 
 
 def ohwait(coro, g_debug={}):
@@ -25,43 +21,39 @@ def ohwait(coro, g_debug={}):
 
     f = inspect.currentframe()
 
-    ret = (None, lib.wrap_coro(coro).__await__())
+    rets = [lib.wrap_coro(coro).__await__()]
     for i in range(no_sync + 1):
         if i > 0:
             gen = ohno.new_generator(f)
-            ret = (ret, gen)
+            rets.append(gen)
 
         f = f.f_back
         i_idx = f.f_lasti + 2
         f_code = f.f_code
 
-        if ohno.is_injected(f_code, i_idx, I_SYNC, I_ASYNC):
+        # TODO: some bytes are changed
+        if ohno.is_injected(f_code, i_idx, i_magic):
             continue
 
-        if i < no_sync:
-            # NOTE: overwrite 2 bytes after CALL_FUNCTION, 100% good
-            i_code = I_SYNC
-            o_len = 2
-        else:
-            # NOTE: overwrite 4 bytes after CALL_FUNCTION
-            # so if python code is like this `return sync/ohwait(..)`
-            # => only 2 bytes left in the `co_code` buffer
-            # `co_code` buffer is malloc(size) in heap
-            # the overflow 2 bytes could cause trouble ...
-            # but the situation is quite rare
-            i_code = I_ASYNC
-            o_len = 4
-
         co_code = f_code.co_code
-        new_co_code = do_inject(co_code, i_idx, i_code)
-        ohno.overwrite_bytes(co_code, i_idx, i_code[:o_len])
-        ohno.replace_co_code(f_code, new_co_code, f_code.co_stacksize + 1)
+
+        # TODO: upper part of injected code might grow...
+        new_co_code = do_inject(co_code, i_idx, i_magic)
+        ohno.overwrite_bytes(
+            co_code, i_idx, new_co_code[i_idx : len(co_code)]
+        )  # NOTE: xxx
+        ohno.replace_co_code(f_code, new_co_code, f_code.co_stacksize + 2)
+
+    ret = None
+    for gen in rets[::-1]:
+        ret = (ret, gen)
 
     if g_debug:
         from dis import dis
         import code
 
+        print(ret)
         code.interact(local={**globals(), **locals(), **g_debug})
 
-    # return ((None, __await__), gen1)
+    # return (((None, gen2), gen1), __await__)
     return ret
