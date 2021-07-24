@@ -28,15 +28,15 @@ def calc_args(arg):
     arg >>= 8
     exts = []
     while arg:
+        # exts.append(arg & 0xff)
         exts.insert(0, arg & 0xFF)
         arg >>= 8
     return most_arg, exts
 
 
-def do_inject(co_code, inject_offset, inject_code):
-    assert len(inject_code) % 2 == 0
+def code_to_insts(co_code):
+    # ignore EXTENDED_ARG opcode (merged with actual bytecode)
 
-    # parse old code
     insts = []
     offset_map = {}
     off_ext = 0
@@ -69,21 +69,33 @@ def do_inject(co_code, inject_offset, inject_code):
             inst["j_inst"] = offset_map[arg]
             inst["is_abs"] = True
 
+    return insts, offset_map
+
+
+def do_inject(co_code, inject_offset, inject_code):
+    assert inject_offset % 2 == 0, "offset must be even number"
+    assert len(inject_code) % 2 == 0, "length of inject code must be even number"
+
+    # parse old code
+    insts, offset_map = code_to_insts(co_code)
+
+    # parse new code + rebase indexes
+    l_insts = len(insts)
+    new_insts, _ = code_to_insts(inject_code)
+    for inst in new_insts:
+        if "j_inst" in inst:
+            inst["j_inst"] += l_insts
+
     # inject
-    insts_order = [i for i in range(len(insts))]
     inject_idx = offset_map[inject_offset]
 
-    new_inst_idx = len(insts)
-    insts.append(
-        {
-            "code": inject_code,
-            "size": len(inject_code),
-        }
-    )
+    insts_order = []
+    insts_order.extend(range(inject_idx))
+    insts_order.extend(range(l_insts, l_insts + len(new_insts)))
+    insts_order.extend(range(inject_idx, l_insts))
+    insts.extend(new_insts)
 
-    insts_order.insert(inject_idx, new_inst_idx)
-
-    # calculate extended args
+    # re-calculate inst offset, inject more EXTENDED_ARGS if needed
     has_changed = True
     while has_changed:
         has_changed = False
@@ -95,7 +107,7 @@ def do_inject(co_code, inject_offset, inject_code):
             rec["offset"] = offset
             offset += rec["size"]
 
-        # verify no_ext
+        # check if need more EXTENDED_ARGS
         for idx in insts_order:
             rec = insts[idx]
             if "j_inst" not in rec:
@@ -114,7 +126,7 @@ def do_inject(co_code, inject_offset, inject_code):
                 rec["size"] = new_size
                 has_changed = True
 
-    # generate code
+    # generate code string from insts
     code = io.BytesIO()
     for idx in insts_order:
         rec = insts[idx]
