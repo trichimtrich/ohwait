@@ -24,31 +24,6 @@ static PyObject *method_count_sync_funcs(PyObject *self, PyObject *args)
     return PyLong_FromLong(c);
 }
 
-// check if injected
-static PyObject *method_is_injected(PyObject *self, PyObject *args)
-{
-    PyCodeObject *co;
-    PyBytesObject *i_code;
-    int i_idx;
-    if (!PyArg_ParseTuple(args, "OiO", &co, &i_idx, &i_code))
-    {
-        return NULL;
-    }
-
-    char *co_code_ptr = PyBytes_AS_STRING(co->co_code);
-    char *i_ptr = PyBytes_AS_STRING(i_code);
-    int i_len = PyBytes_GET_SIZE(i_code);
-
-    if (memcmp(co_code_ptr + i_idx, i_ptr, i_len))
-    {
-        return Py_False;
-    }
-    else
-    {
-        return Py_True;
-    }
-}
-
 // create generator object from frame
 static PyObject *method_new_generator(PyObject *self, PyObject *args)
 {
@@ -111,7 +86,6 @@ static PyObject *method_overwrite_bytes(PyObject *self, PyObject *args)
 
 static PyMethodDef Methods[] = {
     {"count_sync_funcs", method_count_sync_funcs, METH_VARARGS, ""},
-    {"is_injected", method_is_injected, METH_VARARGS, ""},
     {"new_generator", method_new_generator, METH_VARARGS, ""},
     {"replace_co_code", method_replace_co_code, METH_VARARGS, ""},
     {"overwrite_bytes", method_overwrite_bytes, METH_VARARGS, ""},

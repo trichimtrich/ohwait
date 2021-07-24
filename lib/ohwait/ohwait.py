@@ -1,4 +1,5 @@
 import inspect
+import re
 
 from . import _ohno as ohno
 from ._asm import do_inject, asm
@@ -9,6 +10,21 @@ I_MAGIC += asm("UNPACK_SEQUENCE", 3)  # gen -> data -> data
 I_MAGIC += asm("POP_JUMP_IF_FALSE", 6)  # check data == None , jump -> yield from
 I_MAGIC += asm("YIELD_VALUE")  # yield data back => recv data
 I_MAGIC += asm("YIELD_FROM")  # send data, yield from
+
+# NOTE: custom payload to check if function is injected
+# pay attention to the JUMP bytecode and its oparg
+I_MAGIC_PAT = b""
+I_MAGIC_PAT += re.escape(asm("UNPACK_SEQUENCE", 3))
+I_MAGIC_PAT += (
+    b"(?:" + re.escape(asm("EXTENDED_ARG", 0)[:1]) + b".)*"
+)  # if oparg > 0xff
+I_MAGIC_PAT += (
+    re.escape(asm("POP_JUMP_IF_FALSE", 0)[:1]) + b"."
+)  # oparg value is not constant
+I_MAGIC_PAT += re.escape(asm("YIELD_VALUE") + asm("YIELD_FROM"))
+I_MAGIC_PAT = re.compile(I_MAGIC_PAT)
+
+assert I_MAGIC_PAT.match(I_MAGIC), "create issue please : )"
 
 
 def ohwait(coro, g_debug={}):
@@ -31,8 +47,8 @@ def ohwait(coro, g_debug={}):
         f_code = f.f_code
         co_code = f_code.co_code
 
-        # TODO: some bytes are changed
-        if ohno.is_injected(f_code, i_idx, I_MAGIC):
+        # check if func is injected
+        if I_MAGIC_PAT.match(co_code[i_idx:]):
             continue
 
         co_code = f_code.co_code
