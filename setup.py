@@ -4,7 +4,7 @@ from distutils.core import setup, Extension
 def main():
     setup(
         name="ohwait",
-        version="0.0.1",
+        version="0.0.2",
         description="",
         author="trichimtrich",
         author_email="trichimtrich@gmail.com",
