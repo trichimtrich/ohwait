@@ -201,6 +201,8 @@ async def async_func_VERY_GOOD():
     non_ohwait_func()
 ```
 - Another approach is create new code object (with injected code) and bind it to `frame` object instead of using the same code object but only replace the `co_code`. Not sure if it can solve the indirect call problem.
+- Library like `asyncio` works pretty well, but `curio` and `trio` do not. Haven't checked yet, maybe need to switch some more flags of generator object to fool them 😏.
+- Also, there are other concurrency's statements need to check, like `await from`, `await for`.
 
 # References/Materials
 
