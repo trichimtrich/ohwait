@@ -158,6 +158,31 @@ print("=" * 50 + " SECOND RUN " + "=" * 50)
 asyncio.run(async_func())
 ```
 
+- By default `ohwait` uses `asyncio` in coroutine wrapper. To use or switch betwen different libraries, eg: [trio](https://trio.readthedocs.io/) and [curio](https://curio.readthedocs.io/en/latest/), check this:
+
+```python
+# curio
+from ohwait import use_curio
+use_curio()
+curio.run(ohwait_coroutine())
+
+# trio
+from ohwait import use_trio
+use_trio()
+trio.run(ohwait_coroutine)
+
+# switch back to `asyncio`
+from ohwait import use_asyncio
+use_asyncio()
+asyncio.run(ohwait_coroutine())
+```
+
+# Technical details
+
+To be written ...
+
+> Code is only 200 lines, shorter than this README 😜
+
 # Note
 
 It works as expected, but the injection strategy is not perfect. Some of my note for future me/you:
@@ -167,6 +192,7 @@ It works as expected, but the injection strategy is not perfect. Some of my note
 - ~~Currently `co_code` in code object is changed permanently. So when doing injection, bytecodes need satisfy the revisiting of the routines (How about redo the injection with the new code object for each frame).~~
 - Generator wrapper for each subroutine also needs to be collected by GC.
 - Heap overflow can happen if your function doesn't have enough room (after `CALL_FUNCTION` bytecode) for replacing bytecode to unpack and yield data. (eg: function with only this line of code `return ohwait(coro)` ). Current payload size is 8 bytes.
+- We use `UNPACK_SEQUENCE` in payload, it requires extra stack buffer in frame (in this case +2), otherwise will receive SIGSEGV. [Check this](https://github.com/python/cpython/blob/3.8/Objects/frameobject.c#L665)
 - Code object for every functions in call-chain after `ohwait` are changed permanently, because we patch the `co_code` directly, not the `frame` (different between each call to the same function). So if code uses indirect call for mixed `ohwait`, `non-ohwait` functions, unexpected behaviour will happen. Eg:
 ```python
 async def coro(): ...
@@ -201,7 +227,7 @@ async def async_func_VERY_GOOD():
     non_ohwait_func()
 ```
 - Another approach is create new code object (with injected code) and bind it to `frame` object instead of using the same code object but only replace the `co_code`. Not sure if it can solve the indirect call problem.
-- Library like `asyncio` works pretty well, but `curio` and `trio` do not. Haven't checked yet, maybe need to switch some more flags of generator object to fool them 😏.
+- ~~Library like `asyncio` works pretty well, but `curio` and `trio` do not. Haven't checked yet, maybe need to switch some more flags of generator object to fool them 😏.~~
 - Also, there are other concurrency's statements need to check, like `await from`, `await for`.
 
 # References/Materials
