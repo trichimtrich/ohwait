@@ -1,6 +1,8 @@
 # ohwait
 
-An experiment in Python to make `sync` function could do `await` for coroutine, using a high level approach without doing intensive modification of intepreter.
+An **Experiment** in Python to make `sync` function could do `await` for coroutine, using a high level approach without doing intensive modification of intepreter.
+
+[👉 Click here to skip the boring paragraph](#instruction)
 
 ## Background
 
@@ -122,38 +124,38 @@ python setup.py install
 - Usage:
 
 ```python
+import asyncio
 from ohwait import ohwait
 
-async def coro():
-    print("im a coroutine")
-    return 1
 
-def sync_func(): # to be called in a async_func
-    print('sync_func enter')
-    result = ohwait(coro())
-    print('sync_func exit')
+async def coro(a):
+    print("> coroutine is running")
+    await asyncio.sleep(0.5)
+    return "result-" + a
+
+
+def sync_func():  # to be called in a async chain
+    print("> sync_func enter")
+    result = ohwait(coro("from-ohwait-in-sync-func"))
+    print("> sync_func exit")
     return result
+
 
 async def async_func():
-    print('async_func enter')
-    result = 0
-    # Three lines below are syntax corect, and return the same value
-    # Uncomment one line (not all) to check the result.
-    # Currently only 1 `ohwait` call support in the whole `async` call chain.
+    print("> async_func enter")
 
-    # result = ohwait(coro()) 
-    # result = await coro()
-    # result = sync_func()
+    print(await coro("from-normal-await-call"))
+    print(ohwait(coro("from-ohwait-directly")))
+    print(sync_func())
 
-    print('async_func exit')
-    return result
+    print("> async_func exit")
 
 
-## Run your event loop. Currently support `asyncio`, I will check `curio` and `trio` later.
-import asyncio
-loop = asyncio.get_event_loop()
-result = loop.run_until_complete(async_func())
-print('Finish with result:', result)
+print("=" * 50 + " FIRST RUN " + "=" * 50)
+asyncio.run(async_func())
+
+print("=" * 50 + " SECOND RUN " + "=" * 50)
+asyncio.run(async_func())
 ```
 
 # Note
@@ -161,10 +163,44 @@ print('Finish with result:', result)
 It works as expected, but the injection strategy is not perfect. Some of my note for future me/you:
 
 - Check the `ref` count for each object.
-- Support multiple `ohwait` call in `async` call chain. Because of the async frame doing `yield_from`, the second call of `ohwait` in child routine will break the parent frame stack. Change injected bytecode combination might work.
-- Currently `co_code` in code object is changed permanently. So when doing injection, bytecodes need satisfy the revisiting of the routines (How about redo the injection with the new code object for each frame).
+- ~~Support multiple `ohwait` call in `async` call chain. Because of the async frame doing `yield_from`, the second call of `ohwait` in child routine will break the parent frame stack. Change injected bytecode combination might work.~~
+- ~~Currently `co_code` in code object is changed permanently. So when doing injection, bytecodes need satisfy the revisiting of the routines (How about redo the injection with the new code object for each frame).~~
 - Generator wrapper for each subroutine also needs to be collected by GC.
-- Heap overflow can happen if your function doesn't have enough room (after `CALL_FUNCTION` bytecode) for replacing bytecode to unpack and yield data. (eg: function with only this line of code `return ohwait(coro)` )
+- Heap overflow can happen if your function doesn't have enough room (after `CALL_FUNCTION` bytecode) for replacing bytecode to unpack and yield data. (eg: function with only this line of code `return ohwait(coro)` ). Current payload size is 8 bytes.
+- Code object for every functions in call-chain after `ohwait` are changed permanently, because we patch the `co_code` directly, not the `frame` (different between each call to the same function). So if code uses indirect call for mixed `ohwait`, `non-ohwait` functions, unexpected behaviour will happen. Eg:
+```python
+async def coro(): ...
+
+## ohwait function
+def ohwait_func1():
+    ohwait(coro())
+
+def ohwait_func2():
+    ohwait(coro())
+
+## non-ohwait function
+def non_ohwait_func():
+    pass # do anything but call `ohwait`
+
+
+## main - caller
+async def async_func_BAD():
+    for func in (ohwait_func1, non_ohwait_func):
+        func() # indirect call of mixed funcs
+
+async def async_func_GOOD():
+    for func in (ohwait_func1, ohwait_func2):
+        func() # indirect call of `ohwait` functions
+
+async def async_func_VERY_GOOD():
+    # direct call
+    non_ohwait_func()
+    ohwait_func1()
+    non_ohwait_func()
+    ohwait_func2()
+    non_ohwait_func()
+```
+- Another approach is create new code object (with injected code) and bind it to `frame` object instead of using the same code object but only replace the `co_code`. Not sure if it can solve the indirect call problem.
 
 # References/Materials
 
