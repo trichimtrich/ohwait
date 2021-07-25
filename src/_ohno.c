@@ -4,15 +4,15 @@
 
 // TODO: fix ref count
 
-#define CO_INJECTED 0x80000000
-
-// count upward for sync funcs called
+// count upstream for number of frames haven't wrapped in generator yet
 static PyObject *method_count_sync_funcs(PyObject *self, PyObject *args)
 {
     struct _frame *f = PyEval_GetFrame();
     int c = 0;
-    // ignore current frame
-    for (f = f->f_back; f && !(f->f_code->co_flags & (CO_INJECTED | CO_COROUTINE)); f = f->f_back, c++)
+
+    // stop when found 'async function' frame
+    // stop when found a wrapped frame (in generator)
+    for (f = f->f_back; f && !(f->f_code->co_flags & CO_COROUTINE) && (f->f_gen == NULL); f = f->f_back, c++)
     {
     }
 
@@ -57,8 +57,6 @@ static PyObject *method_replace_co_code(PyObject *self, PyObject *args)
     {
         co->co_stacksize = co_stacksize;
     }
-
-    co->co_flags |= CO_INJECTED;
 
     return Py_True;
 }

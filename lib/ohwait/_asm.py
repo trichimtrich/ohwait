@@ -77,23 +77,30 @@ def do_inject(co_code, inject_offset, inject_code):
     assert inject_offset % 2 == 0, "offset must be even number"
     assert len(inject_code) % 2 == 0, "length of inject code must be even number"
 
+    if len(inject_code) == 0:
+        return co_code, 0
+
     # parse old code
     insts, offset_map = code_to_insts(co_code)
 
-    # parse new code + rebase indexes
-    l_insts = len(insts)
+    # parse new code
     new_insts, _ = code_to_insts(inject_code)
+
+    # rebase index
+    inject_start_idx = len(insts)
+    inject_end_idx = inject_start_idx + len(new_insts) - 1
+
     for inst in new_insts:
         if "j_inst" in inst:
-            inst["j_inst"] += l_insts
+            inst["j_inst"] += inject_start_idx
 
     # inject
     inject_idx = offset_map[inject_offset]
 
     insts_order = []
     insts_order.extend(range(inject_idx))
-    insts_order.extend(range(l_insts, l_insts + len(new_insts)))
-    insts_order.extend(range(inject_idx, l_insts))
+    insts_order.extend(range(inject_start_idx, inject_start_idx + len(new_insts)))
+    insts_order.extend(range(inject_idx, inject_start_idx))
     insts.extend(new_insts)
 
     # re-calculate inst offset, inject more EXTENDED_ARGS if needed
@@ -138,4 +145,8 @@ def do_inject(co_code, inject_offset, inject_code):
             code.write(asm(rec["opcode"], rec["arg"]))
 
     code.seek(0)
-    return code.read()
+    new_co_code = code.read()
+    new_inject_offset = insts[inject_start_idx]["offset"]
+    new_inject_end = insts[inject_end_idx]["offset"] + insts[inject_end_idx]["size"]
+
+    return new_co_code, new_inject_offset, new_inject_end

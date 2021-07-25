@@ -43,21 +43,34 @@ def ohwait(coro, g_debug={}):
             rets.append(gen)
 
         f = f.f_back
-        i_idx = f.f_lasti + 2
+        i_offset = f.f_lasti + 2  # f_lasti => CALL_FUNCTIOn
         f_code = f.f_code
         co_code = f_code.co_code
 
         # check if func is injected
-        if I_MAGIC_PAT.match(co_code[i_idx:]):
+        if I_MAGIC_PAT.match(co_code[i_offset:]):
+            print("oh hey")
             continue
 
-        co_code = f_code.co_code
+        # NOTE: upper part of injected code might grow bigger...
+        # call sequence: 1 -> 2 ---------------> 3 ---------------> 4
+        # original func: A -> B (ohwait call) -> C               -> D
+        # injected func: A -> A'              -> B (ohwait caul) -> I_MAGIC -> C -> D
+        # after "ohwait call" at 2, next instruction is 3
+        # YIELD code resets the code layout of frame in the next execution,
+        # so we will hit B again at 3 because of unexpected A'.
+        # Solution is replacing NOP to the old co_code at 3 before do yielding.
+        # Next execution after yielding uses new_co_code, we should be fine.
 
-        # TODO: upper part of injected code might grow...
-        new_co_code = do_inject(co_code, i_idx, I_MAGIC)
-        ohno.overwrite_bytes(
-            co_code, i_idx, new_co_code[i_idx : len(co_code)]
-        )  # NOTE: xxx
+        new_co_code, new_i_offset, new_i_end = do_inject(co_code, i_offset, I_MAGIC)
+        r_code = new_co_code[new_i_offset:new_i_end]
+
+        if i_offset != new_i_offset:
+            # count how many A' == number of NOP for replacing
+            count_nop = (new_i_offset - i_offset) // 2
+            r_code = count_nop * asm("NOP") + r_code
+
+        ohno.overwrite_bytes(co_code, i_offset, r_code)
         ohno.replace_co_code(f_code, new_co_code, f_code.co_stacksize + 2)
 
     ret = None
@@ -65,11 +78,9 @@ def ohwait(coro, g_debug={}):
         ret = (ret, ret, gen)
 
     if g_debug:
-        from dis import dis
         import code
 
-        print(ret)
         code.interact(local={**globals(), **locals(), **g_debug})
 
-    # return (((None, gen2), gen1), __await__)
+    # return ((None, None, gen), (None, None, gen), __await__)
     return ret
